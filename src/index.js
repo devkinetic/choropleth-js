@@ -127,11 +127,6 @@ ss.jenks = function(data, n_classes) {
 
 (function (window, $) {
 
-  /**
-   * Private properties
-   */
-  var D3 = window.d3, topojson = window.topojson;
-
   // ad-hoc function mapping for various layers
   var _mapping = {
     'nation': renderPath,
@@ -278,6 +273,7 @@ ss.jenks = function(data, n_classes) {
 
   /**
    * Computes mouse event coordinates relative to the choropleth container
+   * 
    * @param event
    * @returns {{x: number, y: number}}
    */
@@ -312,12 +308,19 @@ ss.jenks = function(data, n_classes) {
     }
   }
 
+  /**
+   * Given a path, return just the file extension. Does not support file.ext.ext format.
+   * 
+   * @param filepath 
+   * @returns {string}
+   */
   function getFileTypeFromPath(filepath) {
     return filepath.split('\\').pop().split('/').pop().split('.').pop();
   }
 
   /**
    * Fetches specified Topology data
+   * 
    * @param name
    * @param layer
    * @returns {null|*}
@@ -367,6 +370,7 @@ ss.jenks = function(data, n_classes) {
 
   /**
    * Adds data properties to topography features.
+   * 
    * @returns {null}
    */
   function augmentTopography(topo, feature, data) {
@@ -394,6 +398,7 @@ ss.jenks = function(data, n_classes) {
 
   /**
    * Logging
+   * 
    * @param msg Message to print
    * @param type Type of message
    */
@@ -411,6 +416,7 @@ ss.jenks = function(data, n_classes) {
 
   /**
    * Applies defaults on top of provided settings object
+   * 
    * @param obj
    * @returns {*}
    */
