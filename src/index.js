@@ -124,233 +124,6 @@ ss.jenks = function(data, n_classes) {
   return kclass;
 };
 
-// Copyright 2021, Observable Inc.
-// Released under the ISC license.
-// https://observablehq.com/@d3/color-legend
-function Swatches(color, {
-  columns = null,
-  format,
-  unknown: formatUnknown,
-  swatchSize = 15,
-  swatchWidth = swatchSize,
-  swatchHeight = swatchSize,
-  marginLeft = 0
-} = {}) {
-  const id = `-swatches-${Math.random().toString(16).slice(2)}`;
-  const unknown = formatUnknown == null ? undefined : color.unknown();
-  const unknowns = unknown == null || unknown === d3.scaleImplicit ? [] : [unknown];
-  const domain = color.domain().concat(unknowns);
-  if (format === undefined) format = x => x === unknown ? formatUnknown : x;
-
-  function entity(character) {
-    return `&#${character.charCodeAt(0).toString()};`;
-  }
-
-  if (columns !== null) return htl.html`<div style="display: flex; align-items: center; margin-left: ${+marginLeft}px; min-height: 33px; font: 10px sans-serif;">
-  <style>
-
-.${id}-item {
-  break-inside: avoid;
-  display: flex;
-  align-items: center;
-  padding-bottom: 1px;
-}
-
-.${id}-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: calc(100% - ${+swatchWidth}px - 0.5em);
-}
-
-.${id}-swatch {
-  width: ${+swatchWidth}px;
-  height: ${+swatchHeight}px;
-  margin: 0 0.5em 0 0;
-}
-
-  </style>
-  <div style="width: 100%; columns: ${columns};">${domain.map(value => {
-    const label = `${format(value)}`;
-    return htl.html`<div class="${id}-item">
-      <div class="${id}-swatch" style="background:${color(value)};"></div>
-      <div class="${id}-label" title="${label.replace(/["&]/g, entity)}">${label}</div>
-    </div>`;
-  })}
-  </div>
-</div>`;
-
-  return htl.html`<div style="display: flex; align-items: center; min-height: 33px; margin-left: ${+marginLeft}px; font: 10px sans-serif;">
-  <style>
-
-.${id} {
-  display: inline-flex;
-  align-items: center;
-  margin-right: 1em;
-}
-
-.${id}::before {
-  content: "";
-  width: ${+swatchWidth}px;
-  height: ${+swatchHeight}px;
-  margin-right: 0.5em;
-  background: var(--color);
-}
-
-  </style>
-  <div>${domain.map(value => htl.html`<span class="${id}" style="--color: ${color(value)}">${format(value)}</span>`)}</div>`;
-}
-
-// Copyright 2021, Observable Inc.
-// Released under the ISC license.
-// https://observablehq.com/@d3/color-legend
-function Legend(color, {
-  title,
-  tickSize = 6,
-  width = 320, 
-  height = 44 + tickSize,
-  marginTop = 18,
-  marginRight = 0,
-  marginBottom = 16 + tickSize,
-  marginLeft = 0,
-  ticks = width / 64,
-  tickFormat,
-  tickValues
-} = {}) {
-
-  function ramp(color, n = 256) {
-    const canvas = document.createElement("canvas");
-    canvas.width = n;
-    canvas.height = 1;
-    const context = canvas.getContext("2d");
-    for (let i = 0; i < n; ++i) {
-      context.fillStyle = color(i / (n - 1));
-      context.fillRect(i, 0, 1, 1);
-    }
-    return canvas;
-  }
-
-  const svg = d3.create("svg")
-      .attr("width", width)
-      .attr("height", height)
-      .attr("viewBox", [0, 0, width, height])
-      .style("overflow", "visible")
-      .style("display", "block");
-
-  let tickAdjust = g => g.selectAll(".tick line").attr("y1", marginTop + marginBottom - height);
-  let x;
-
-  // Continuous
-  if (color.interpolate) {
-    const n = Math.min(color.domain().length, color.range().length);
-
-    x = color.copy().rangeRound(d3.quantize(d3.interpolate(marginLeft, width - marginRight), n));
-
-    svg.append("image")
-        .attr("x", marginLeft)
-        .attr("y", marginTop)
-        .attr("width", width - marginLeft - marginRight)
-        .attr("height", height - marginTop - marginBottom)
-        .attr("preserveAspectRatio", "none")
-        .attr("xlink:href", ramp(color.copy().domain(d3.quantize(d3.interpolate(0, 1), n))).toDataURL());
-  }
-
-  // Sequential
-  else if (color.interpolator) {
-    x = Object.assign(color.copy()
-        .interpolator(d3.interpolateRound(marginLeft, width - marginRight)),
-        {range() { return [marginLeft, width - marginRight]; }});
-
-    svg.append("image")
-        .attr("x", marginLeft)
-        .attr("y", marginTop)
-        .attr("width", width - marginLeft - marginRight)
-        .attr("height", height - marginTop - marginBottom)
-        .attr("preserveAspectRatio", "none")
-        .attr("xlink:href", ramp(color.interpolator()).toDataURL());
-
-    // scaleSequentialQuantile doesn’t implement ticks or tickFormat.
-    if (!x.ticks) {
-      if (tickValues === undefined) {
-        const n = Math.round(ticks + 1);
-        tickValues = d3.range(n).map(i => d3.quantile(color.domain(), i / (n - 1)));
-      }
-      if (typeof tickFormat !== "function") {
-        tickFormat = d3.format(tickFormat === undefined ? ",f" : tickFormat);
-      }
-    }
-  }
-
-  // Threshold
-  else if (color.invertExtent) {
-    const thresholds
-        = color.thresholds ? color.thresholds() // scaleQuantize
-        : color.quantiles ? color.quantiles() // scaleQuantile
-        : color.domain(); // scaleThreshold
-
-    const thresholdFormat
-        = tickFormat === undefined ? d => d
-        : typeof tickFormat === "string" ? d3.format(tickFormat)
-        : tickFormat;
-
-    x = d3.scaleLinear()
-        .domain([-1, color.range().length - 1])
-        .rangeRound([marginLeft, width - marginRight]);
-
-    svg.append("g")
-      .selectAll("rect")
-      .data(color.range())
-      .join("rect")
-        .attr("x", (d, i) => x(i - 1))
-        .attr("y", marginTop)
-        .attr("width", (d, i) => x(i) - x(i - 1))
-        .attr("height", height - marginTop - marginBottom)
-        .attr("fill", d => d);
-
-    tickValues = d3.range(thresholds.length);
-    tickFormat = i => thresholdFormat(thresholds[i], i);
-  }
-
-  // Ordinal
-  else {
-    x = d3.scaleBand()
-        .domain(color.domain())
-        .rangeRound([marginLeft, width - marginRight]);
-
-    svg.append("g")
-      .selectAll("rect")
-      .data(color.domain())
-      .join("rect")
-        .attr("x", x)
-        .attr("y", marginTop)
-        .attr("width", Math.max(0, x.bandwidth() - 1))
-        .attr("height", height - marginTop - marginBottom)
-        .attr("fill", color);
-
-    tickAdjust = () => {};
-  }
-
-  svg.append("g")
-      .attr("transform", `translate(0,${height - marginBottom})`)
-      .call(d3.axisBottom(x)
-        .ticks(ticks, typeof tickFormat === "string" ? tickFormat : undefined)
-        .tickFormat(typeof tickFormat === "function" ? tickFormat : undefined)
-        .tickSize(tickSize)
-        .tickValues(tickValues))
-      .call(tickAdjust)
-      .call(g => g.select(".domain").remove())
-      .call(g => g.append("text")
-        .attr("x", marginLeft)
-        .attr("y", marginTop + marginBottom - height - 6)
-        .attr("fill", "currentColor")
-        .attr("text-anchor", "start")
-        .attr("font-weight", "bold")
-        .attr("class", "title")
-        .text(title));
-
-  return svg.node();
-}
-
 (function (window, $) {
 
   // ad-hoc function mapping for various layers
@@ -452,6 +225,8 @@ function Legend(color, {
       .attr('d', SELF.path)
       .attr('class', function (d) { return applyUnitClasses(d, layerName)})
       .style("fill", function (d) {
+        console.log();
+
         return (d.properties.hasOwnProperty('value')) ? SELF.colorScale(d.properties.value) : null;
       });
   }
@@ -720,67 +495,118 @@ function Legend(color, {
       if (options.colorCustom.hasOwnProperty(idx)) {
         if (limit) {
           if (idx <= (limit - 1)) {
-            colors.push(options.colorCustom[idx]);
+            colors.push('#' + options.colorCustom[idx]);
           }
         } else {
-          colors.push(options.colorCustom[idx]);
+          colors.push('#' + options.colorCustom[idx]);
         }
       }
     }
     return colors;
   }
 
-  /**
-   * Returns color scale based on the settings provided
-   * @param options
-   * @returns {*}
-   */
-  function getColorScale(options, data) {
-    // gather the data into an array (used for some classifications)
-    var dataValues = [];
-    data.forEach(function(d) { dataValues.push(+d.value); });
+  function getColorScheme(scheme, numColors) {
+    var colors = [];
+    
+    switch (scheme) {
+      case 'Category10':
+      case 'Accent':
+      case 'Dark2':
+      case 'Paired':
+      case 'Pastel1':
+      case 'Pastel2':
+      case 'Set1':
+      case 'Set2':
+      case 'Set3':
+      case 'Tableau10':
+        colorScheme = d3['scheme' + options.colorScheme];
+        for (var i = 0; i > numColors; i++) {
+          colors.push(colorScheme[i]);
+        }
+        break;
+      default:
+        colors = d3['scheme' + scheme][numColors];
+        break;
+    }
 
-    // TODO add support for custom callback
+    return colors;
+  }
 
-    // Determine the color scheme
-    var range = [];
+  function getScale(options, data) {
+    var scale = null;
 
     switch (options.classification) {
       
       // Exogenous
       case 'exo-ad-hoc':
-        var numColors = options.classificationBreaksAdHoc.length + 1;
-        range = (options.colorScheme == 'custom') ? getCustomColors(options, numColors) : d3['scheme' + options.colorScheme][numColors];
-        var scale = d3.scaleThreshold()
-          .domain(options.classificationBreaksAdHoc)
-          .range(range);
+        scale = d3.scaleThreshold();
         break;
 
       // Endogenous
       case 'endo-natural-breaks':
-        range = (options.colorScheme == 'custom') ? getCustomColors(options, options.classificationBreaksEndo) : d3['scheme' + options.colorScheme][options.classificationBreaksEndo];
-        var scale = d3.scaleThreshold()
-          .domain(ss.jenks(dataValues, classificationBreaksEndo))
-          .range(range);
+        scale = d3.scaleThreshold();
         break;
 
       case 'endo-equal-intervals':
-        var dataExtent = d3.extent(data, d => d.value);
-        range = (options.colorScheme == 'custom') ? getCustomColors(options, options.classificationBreaksEndo) : d3['scheme' + options.colorScheme][options.classificationBreaksEndo];
-        var scale = d3.scaleQuantize()
-          .domain(dataExtent)
-          .range(range);
+      // https://stackoverflow.com/questions/52398668/calculate-how-many-std-deviations-the-values-of-certain-keys-are-from-the-mean
+      case 'endo-equal-intervals-standard':
+        scale = d3.scaleQuantize();
+        break;
+
+      // case 'endo-quantiles':
+      //   scale = d3.scale????;
+      //   break;
+
+      // https://ibis.health.state.nm.us/resource/mapchoroclasses.html#part2e
+      // case 'endo-geometric':
+      //   scale = d3.scale????;
+      //   break;
+
+      // case 'endo-nested-means':
+      //   scale = d3.scale????;
+      //   break;
+      
+      // Unclassified
+      case 'unclassified':
+      default:
+        scale = (options.unclassifiedOrdinal) ? d3.scaleOrdinal() : d3.scaleLinear();
+        break;
+    }
+
+    return scale;
+  }
+
+  function getDomain(options, data) {
+
+    var domain = [];
+
+    // gather the data into an array (used for some classifications)
+    var dataValues = [];
+    data.forEach(function(d) { dataValues.push(+d.value); });
+
+    switch (options.classification) {
+      
+      // Exogenous
+      case 'exo-ad-hoc':
+        domain = options.classificationBreaksAdHoc;
+        break;
+
+      // Endogenous
+      case 'endo-natural-breaks':
+        domain = ss.jenks(dataValues, options.classificationBreaksEndo);
+        break;
+
+      case 'endo-equal-intervals':
+        domain = d3.extent(data, d => d.value);
         break;
 
       // TODO https://stackoverflow.com/questions/52398668/calculate-how-many-std-deviations-the-values-of-certain-keys-are-from-the-mean
       case 'endo-equal-intervals-standard':
         var deviation = d3.deviation(dataValues);
         var mean = d3.mean(dataValues);
-        range = (options.colorScheme == 'custom') ? getCustomColors(options, options.classificationBreaksEndo) : d3['scheme' + options.colorScheme][options.classificationBreaksEndo];
-        var scale = d3.scaleQuantize()
-          .domain([mean-deviation, mean+deviation])
-          .range(range);
+        domain = [mean - deviation, mean + deviation];
         break;
+
       // case 'endo-quantiles':
       //   scale = d3.scale????;
       //   break;
@@ -798,28 +624,76 @@ function Legend(color, {
       case 'unclassified':
       default:
         if (options.unclassifiedOrdinal) {
-          var ordinalValues = [];
           for (var key in options.unclassifiedOrdinal) {
             if (options.unclassifiedOrdinal.hasOwnProperty(key)) {
-              ordinalValues.push(key);
+              domain.push(key);
             }
           }
-          var numColors = objectLength(options.unclassifiedOrdinal);
-          range = (options.colorScheme == 'custom') ? getCustomColors(options, numColors) : d3['scheme' + options.colorScheme][numColors];
-          var scale = d3.scaleOrdinal()
-            .domain(ordinalValues)
-            .range(range);
         } else {
-          var dataExtent = d3.extent(data, d => d.value);
-          // TODO add support for interpolate
-          range = (options.colorScheme == 'custom') ? getCustomColors(options, 2) : d3['scheme' + options.colorScheme][2];
-          //['#d3d1d1', 'black']
-          var scale = d3.scaleLinear().domain(dataExtent).range(range);
+          domain = d3.extent(data, d => d.value);
         }
         break;
     }
 
-    return scale;
+    return domain;
+  }
+
+  function getRange(options, data) {
+    var range = [];
+    var numColors = 0;
+
+    switch (options.classification) {
+      
+      // Exogenous
+      case 'exo-ad-hoc':
+        numColors = options.classificationBreaksAdHoc.length + 1;
+        break;
+
+      // Endogenous
+      case 'endo-natural-breaks':
+      case 'endo-equal-intervals':
+      case 'endo-equal-intervals-standard':
+        numColors = options.classificationBreaksEndo + 1;
+        break;
+
+      // case 'endo-quantiles':
+      //   scale = d3.scale????;
+      //   break;
+
+      // https://ibis.health.state.nm.us/resource/mapchoroclasses.html#part2e
+      // case 'endo-geometric':
+      //   scale = d3.scale????;
+      //   break;
+
+      // case 'endo-nested-means':
+      //   scale = d3.scale????;
+      //   break;
+      
+      // Unclassified
+      case 'unclassified':
+      default:
+        if (options.unclassifiedOrdinal) {
+          numColors = objectLength(options.unclassifiedOrdinal);
+        } else {
+          numColors = 2;
+        }
+        break;
+    }
+
+    return (options.colorScheme == 'custom') ? getCustomColors(options, numColors) : getColorScheme(options.colorScheme, numColors);
+  }
+
+  /**
+   * Returns color scale based on the settings provided
+   * @param options
+   * @returns {*}
+   */
+  function getColorScale(options, data) {
+    var scale = getScale(options, data);
+    var domain = getDomain(options, data);
+    var range = getRange(options, data);
+
+    return (scale, domain, range) ? scale.domain(domain).range(range) : null;
   }
 
   /**
@@ -831,18 +705,265 @@ function Legend(color, {
    * @returns {*} Rendered string
    */
   function renderTemplate(tpl, data) {
-    var processed = [];
+    // unformatted values
+    var unformatted = [];
     for (var match of tpl.matchAll(/\[\[([A-z0-9_]+)]]/g)) {
-      if (processed.indexOf(match[1]) !== -1) {
+      if (unformatted.indexOf(match[1]) !== -1) {
         continue;
       }
-      processed.push(match[1]);
+      unformatted.push(match[1]);
       if (data.hasOwnProperty(match[1])) {
         tpl = tpl.replaceAll(match[0], data[match[1]]);
       }
     }
 
+    // formatted values using value|format like 12345|$.2s
+    var formatted = [];
+    for (var match of tpl.matchAll(/\[\[([A-z0-9_]+)\|(.*)]]/g)) {
+      if (formatted.indexOf(match[1]) !== -1) {
+        continue;
+      }
+      formatted.push(match[1]);
+      if (data.hasOwnProperty(match[1])) {
+        tpl = tpl.replaceAll(match[0], d3.format(match[2])(data[match[1]]));
+      }
+    }
+
     return tpl;
+  }
+
+  function swatches(color, {
+    columns = null,
+    format,
+    unknown: formatUnknown,
+    swatchSize = 15,
+    swatchWidth = swatchSize,
+    swatchHeight = swatchSize,
+    marginLeft = 0
+  } = {}) {
+    var SELF = this;
+    const id = `-swatches-${Math.random().toString(16).slice(2)}`;
+    const unknown = formatUnknown == null ? undefined : color.unknown();
+    const unknowns = unknown == null || unknown === d3.scaleImplicit ? [] : [unknown];
+    const domain = color.domain().concat(unknowns);
+    if (format === undefined) format = x => x === unknown ? formatUnknown : x;
+  
+    function entity(character) {
+      return `&#${character.charCodeAt(0).toString()};`;
+    }
+
+    var swatches = '';
+  
+    if (columns !== null) {
+      swatches = `<div style="display: flex; align-items: center; margin-left: ${+marginLeft}px; min-height: 33px; font: 10px sans-serif;">
+        <style>
+        .${id}-item {
+          break-inside: avoid;
+          display: flex;
+          align-items: center;
+          padding-bottom: 1px;
+        }
+        
+        .${id}-label {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: calc(100% - ${+swatchWidth}px - 0.5em);
+        }
+        
+        .${id}-swatch {
+          width: ${+swatchWidth}px;
+          height: ${+swatchHeight}px;
+          margin: 0 0.5em 0 0;
+        }
+        </style>
+        <div style="width: 100%; columns: ${columns};">`;
+
+      domain.map(value => {
+        const label = `${format(value)}`;
+        swatches += `<div class="${id}-item">
+            <div class="${id}-swatch" style="background:${color(value)};"></div>
+            <div class="${id}-label" title="${label.replace(/["&]/g, entity)}">${label}</div>
+          </div>`;
+      });
+
+      swatches += '</div></div>';
+    } else {
+      swatches += `<div style="display: flex; align-items: center; min-height: 33px; margin-left: ${+marginLeft}px; font: 10px sans-serif;">
+        <style>
+        .${id} {
+          display: inline-flex;
+          align-items: center;
+          margin-right: 1em;
+        }
+        .${id}::before {
+          content: "";
+          width: ${+swatchWidth}px;
+          height: ${+swatchHeight}px;
+          margin-right: 0.5em;
+          background: var(--color);
+        }
+        </style>
+        <div>`;
+
+      domain.map(value => {
+        swatches += `<span class="${id}" style="--color: ${color(value)}">${format(value)}</span>`;
+      });
+
+      swatches += '</div></div>';
+    }
+
+    SELF.legend.html(swatches);
+  }
+
+  // <div>${domain.map(value => SELF.legend.html(`<span class="${id}" style="--color: ${color(value)}">${format(value)}</span>`))}</div></div>`);
+  
+  function legend(color, {
+    title,
+    tickSize = 6,
+    width = 320, 
+    height = 44 + tickSize,
+    marginTop = 18,
+    marginRight = 0,
+    marginBottom = 16 + tickSize,
+    marginLeft = 0,
+    ticks = width / 64,
+    tickFormat,
+    tickValues
+  } = {}) {
+    var SELF = this;
+  
+    function ramp(color, n = 256) {
+      const canvas = document.createElement("canvas");
+      canvas.width = n;
+      canvas.height = 1;
+      const context = canvas.getContext("2d");
+      for (let i = 0; i < n; ++i) {
+        context.fillStyle = color(i / (n - 1));
+        context.fillRect(i, 0, 1, 1);
+      }
+      return canvas;
+    }
+
+    const svg = SELF.legend.append("svg")
+      .attr("width", width)
+      .attr("height", height)
+      .attr("viewBox", [0, 0, width, height])
+      .style("overflow", "visible")
+      .style("display", "block");
+  
+    let tickAdjust = g => g.selectAll(".tick line").attr("y1", marginTop + marginBottom - height);
+    let x;
+  
+    // Continuous
+    if (color.interpolate) {
+      const n = Math.min(color.domain().length, color.range().length);
+  
+      x = color.copy().rangeRound(d3.quantize(d3.interpolate(marginLeft, width - marginRight), n));
+  
+      svg.append("image")
+          .attr("x", marginLeft)
+          .attr("y", marginTop)
+          .attr("width", width - marginLeft - marginRight)
+          .attr("height", height - marginTop - marginBottom)
+          .attr("preserveAspectRatio", "none")
+          .attr("xlink:href", ramp(color.copy().domain(d3.quantize(d3.interpolate(0, 1), n))).toDataURL());
+    }
+  
+    // Sequential
+    else if (color.interpolator) {
+      x = Object.assign(color.copy()
+          .interpolator(d3.interpolateRound(marginLeft, width - marginRight)),
+          {range() { return [marginLeft, width - marginRight]; }});
+  
+      svg.append("image")
+          .attr("x", marginLeft)
+          .attr("y", marginTop)
+          .attr("width", width - marginLeft - marginRight)
+          .attr("height", height - marginTop - marginBottom)
+          .attr("preserveAspectRatio", "none")
+          .attr("xlink:href", ramp(color.interpolator()).toDataURL());
+  
+      // scaleSequentialQuantile doesn’t implement ticks or tickFormat.
+      if (!x.ticks) {
+        if (tickValues === undefined) {
+          const n = Math.round(ticks + 1);
+          tickValues = d3.range(n).map(i => d3.quantile(color.domain(), i / (n - 1)));
+        }
+        if (typeof tickFormat !== "function") {
+          tickFormat = d3.format(tickFormat === undefined ? ",f" : tickFormat);
+        }
+      }
+    }
+  
+    // Threshold
+    else if (color.invertExtent) {
+      const thresholds
+          = color.thresholds ? color.thresholds() // scaleQuantize
+          : color.quantiles ? color.quantiles() // scaleQuantile
+          : color.domain(); // scaleThreshold
+  
+      const thresholdFormat
+          = tickFormat === undefined ? d => d
+          : typeof tickFormat === "string" ? d3.format(tickFormat)
+          : tickFormat;
+  
+      x = d3.scaleLinear()
+          .domain([-1, color.range().length - 1])
+          .rangeRound([marginLeft, width - marginRight]);
+  
+      svg.append("g")
+        .selectAll("rect")
+        .data(color.range())
+        .join("rect")
+          .attr("x", (d, i) => x(i - 1))
+          .attr("y", marginTop)
+          .attr("width", (d, i) => x(i) - x(i - 1))
+          .attr("height", height - marginTop - marginBottom)
+          .attr("fill", d => d);
+  
+      tickValues = d3.range(thresholds.length);
+      tickFormat = i => thresholdFormat(thresholds[i], i);
+    }
+  
+    // Ordinal
+    else {
+      x = d3.scaleBand()
+          .domain(color.domain())
+          .rangeRound([marginLeft, width - marginRight]);
+  
+      svg.append("g")
+        .selectAll("rect")
+        .data(color.domain())
+        .join("rect")
+          .attr("x", x)
+          .attr("y", marginTop)
+          .attr("width", Math.max(0, x.bandwidth() - 1))
+          .attr("height", height - marginTop - marginBottom)
+          .attr("fill", color);
+  
+      tickAdjust = () => {};
+    }
+  
+    svg.append("g")
+        .attr("transform", `translate(0,${height - marginBottom})`)
+        .call(d3.axisBottom(x)
+          .ticks(ticks, typeof tickFormat === "string" ? tickFormat : undefined)
+          .tickFormat(typeof tickFormat === "function" ? tickFormat : undefined)
+          .tickSize(tickSize)
+          .tickValues(tickValues))
+        .call(tickAdjust)
+        .call(g => g.select(".domain").remove())
+        .call(g => g.append("text")
+          .attr("x", marginLeft)
+          .attr("y", marginTop + marginBottom - height - 6)
+          .attr("fill", "currentColor")
+          .attr("text-anchor", "start")
+          .attr("font-weight", "bold")
+          .attr("class", "title")
+          .text(title));
+  
+    return svg.node();
   }
 
   /**
@@ -873,7 +994,7 @@ function Legend(color, {
     }
     this.EL = d3.select(this.options.element)
 
-    this.SVG = this.EL.select('svg');
+    this.SVG = this.EL.select('svg.choropleth--map');
     if (this.SVG.empty()) {
       this.SVG = d3.select(this.options.element).append('svg');
     }
@@ -948,8 +1069,7 @@ function Legend(color, {
       // render callouts
       // render legend
       if (SELF.options.legend) {
-
-        SELF.legend = SELF.EL.append('dl').attr('class', 'choropleth--legend');
+        SELF.legend = SELF.EL.append('div').attr('class', 'choropleth--legend');
         SELF.updateLegend();
       }
     }
@@ -980,38 +1100,15 @@ function Legend(color, {
     if (!this.options.legend) {
       return;
     }
+    var options = {}
 
-    // Legend varies based on the color scheme
-    // @todo - determine the ways of generating various combinations of
-    // scales and classifications
-
-    // Render simple legend
-    if (
-      SELF.options.colorScheme == 'qualitative' ||
-      SELF.options.colorScheme == 'grayscale'
-    ) {
-      SELF.legend.attr('class', 'choropleth--legend choropleth--legend--' + SELF.options.colorScheme);
-      for (var v of this.colorScale.domain()) {
-        var c = SELF.colorScale(v);
-        if (
-          SELF.options.hasOwnProperty('legendLabels') &&
-          SELF.options.legendLabels != null &&
-          SELF.options.legendLabels.hasOwnProperty(v))
-        {
-          var l = SELF.options.legendLabels[v];
-        } else {
-          var l = v.toString();
-        }
-
-        SELF.legend.append('dt').attr('class', 'choropleth--legend-value').style('background-color', c);
-        SELF.legend.append('dd').attr('class', 'choropleth--legend-label').html(l);
-      }
+    if (SELF.options.classification != 'unclassified') {
+      if (SELF.options.legendTitle) options.title = SELF.options.legendTitle;
+      if (SELF.options.legendTickFormat) options.tickFormat = SELF.options.legendTickFormat;
+      legend.call(SELF, SELF.colorScale, options);
+    } else {
+      swatches.call(SELF, SELF.colorScale, options);
     }
-    // Render band legend (band scale)
-    else {
-
-    }
-
   }
 
   /**
