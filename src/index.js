@@ -486,7 +486,7 @@ ss.jenks = function(data, n_classes) {
   }
 
   function objectLength(object) {
-    return Object.keys ? objectLengthModern : objectLengthLegacy;
+    return Object.keys ? objectLengthModern(object) : objectLengthLegacy(object);
   }
 
   function getCustomColors(options, limit = null) {
@@ -505,8 +505,9 @@ ss.jenks = function(data, n_classes) {
     return colors;
   }
 
-  function getColorScheme(scheme, numColors) {
+  function getColorScheme(options, numColors) {
     var colors = [];
+    var scheme = options.colorScheme;
     
     switch (scheme) {
       case 'Category10':
@@ -519,8 +520,8 @@ ss.jenks = function(data, n_classes) {
       case 'Set2':
       case 'Set3':
       case 'Tableau10':
-        colorScheme = d3['scheme' + options.colorScheme];
-        for (var i = 0; i > numColors; i++) {
+        var colorScheme = d3['scheme' + scheme];
+        for (var i = 0; i < numColors; i++) {
           colors.push(colorScheme[i]);
         }
         break;
@@ -576,7 +577,7 @@ ss.jenks = function(data, n_classes) {
     return scale;
   }
 
-  function getDomain(options, data) {
+  function getDomain(options, data, labels = false) {
 
     var domain = [];
 
@@ -672,7 +673,7 @@ ss.jenks = function(data, n_classes) {
       // Unclassified
       case 'unclassified':
       default:
-        if (options.unclassifiedOrdinal) {
+        if (options.hasOwnProperty('unclassifiedOrdinal') && objectLength(options.unclassifiedOrdinal) > 0) {
           numColors = objectLength(options.unclassifiedOrdinal);
         } else {
           numColors = 2;
@@ -680,7 +681,7 @@ ss.jenks = function(data, n_classes) {
         break;
     }
 
-    return (options.colorScheme == 'custom') ? getCustomColors(options, numColors) : getColorScheme(options.colorScheme, numColors);
+    return (options.colorScheme == 'custom') ? getCustomColors(options, numColors) : getColorScheme(options, numColors);
   }
 
   /**
@@ -1097,17 +1098,29 @@ ss.jenks = function(data, n_classes) {
   // Adds legend to the mix
   Choropleth.prototype.updateLegend = function () {
     var SELF = this;
-    if (!this.options.legend) {
+    if (!SELF.options.legend) {
       return;
     }
-    var options = {}
+    var options = {};
+    var colorScale = SELF.colorScale;
+
+    // Get a version of the color scale that uses the labels vs the values for human consumption.
+    if (SELF.options.unclassifiedOrdinal) {
+      var domain = [];
+      for (var key in SELF.options.unclassifiedOrdinal) {
+        if (SELF.options.unclassifiedOrdinal.hasOwnProperty(key)) {
+          domain.push(SELF.options.unclassifiedOrdinal[key]);
+        }
+      }
+      colorScale.domain(domain);
+    }
 
     if (SELF.options.classification != 'unclassified') {
       if (SELF.options.legendTitle) options.title = SELF.options.legendTitle;
       if (SELF.options.legendTickFormat) options.tickFormat = SELF.options.legendTickFormat;
-      legend.call(SELF, SELF.colorScale, options);
+      legend.call(SELF, colorScale, options);
     } else {
-      swatches.call(SELF, SELF.colorScale, options);
+      swatches.call(SELF, colorScale, options);
     }
   }
 
