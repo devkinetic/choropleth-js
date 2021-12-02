@@ -996,8 +996,14 @@ ss.jenks = function(data, n_classes) {
     this.EL = d3.select(this.options.element);
 
     this.SVG = this.EL.select('svg.choropleth--map');
+    var svgWrapper = this.EL.select('.choropleth--wrapper');
+
+    if (svgWrapper.empty()) {
+      this.SVG = d3.select(this.options.element).append('div').attr('class', 'choropleth--wrapper');
+    }
+
     if (this.SVG.empty()) {
-      this.SVG = d3.select(this.options.element).append('svg');
+      this.SVG = d3.select('.choropleth--wrapper').append('svg').attr('class', 'choropleth--map');
     }
 
     // Calculate sizes
@@ -1071,7 +1077,7 @@ ss.jenks = function(data, n_classes) {
       // render callouts
       // render legend
       if (SELF.options.legend) {
-        SELF.legend = SELF.EL.append('div').attr('class', 'choropleth--legend');
+        SELF.legend = SELF.EL.insert('div').attr('class', 'choropleth--legend').lower();
         SELF.updateLegend();
       }
     }
@@ -1179,6 +1185,18 @@ ss.jenks = function(data, n_classes) {
       message('Data layer not found', 'warning');
       return;
     }
+
+    var screenReaderTemplate = (SELF.options.tickFormat) ? '[[name]]: [[value|' + SELF.options.tickFormat + ']]' : '[[name]]: [[value]]';
+    var screenReaderId = SELF.EL.attr('id') + '-sr';
+    var screenReader = SELF.SVG.append('g')
+      .attr('role', 'img')
+      .attr('aria-labelledby', screenReaderId);
+    var srd = SELF.data.map(function (d) {
+      return renderTemplate(screenReaderTemplate, d);
+      }).join('. ');
+    screenReader.append('desc')
+      .attr('id', screenReaderId)
+      .text(srd);
 
     var layer = SELF.SVG.append('g').attr('class', 'layer layer--data layer--' + layerName),
       layerData = topojson.feature(SELF.options.topography, SELF.options.topography.objects[layerName]).features;
