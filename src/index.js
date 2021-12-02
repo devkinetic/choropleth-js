@@ -993,7 +993,7 @@ ss.jenks = function(data, n_classes) {
     if (!this.options.element || d3.select(this.options.element).empty()) {
       message('element does not exists', 'error');
     }
-    this.EL = d3.select(this.options.element)
+    this.EL = d3.select(this.options.element);
 
     this.SVG = this.EL.select('svg.choropleth--map');
     if (this.SVG.empty()) {
@@ -1036,6 +1036,7 @@ ss.jenks = function(data, n_classes) {
 
     // Wait for data to be loaded
     loaded.await(function (err, data, topography) {
+      SELF.data = data;
       SELF.colorScale = getColorScale(SELF.options, data);
       SELF.options.colorScale = SELF.colorScale;
       // replace topography option with loaded objects
@@ -1213,7 +1214,51 @@ ss.jenks = function(data, n_classes) {
           subscribers['click'].forEach( function(cb) {
             cb.call(SELF, e, obj);
           });
+        });
+      
+      // Add a select box with details for mobile
+      var stateSelectorWrapper = SELF.EL.append('div')
+        .attr('class', 'form-item form-type-select choropleth--state-selector');
+      var stateSelectorId = SELF.EL.attr('id') + '-state-selector';
+      stateSelectorWrapper.append('label')
+        .attr('for', stateSelectorId)
+        .text('Select a state/region to view details:');
+      var stateSelector = stateSelectorWrapper.append('select')
+        .attr('id', stateSelectorId);
+      stateSelector.append('option')
+        .text('- Select -')
+        .attr('value', 'none');
+      var stateSelectorOptions = stateSelector.selectAll("option")
+        .data(SELF.data)
+        .enter()
+        .append("option");
+      stateSelectorOptions.text(function(d) {
+          return d.name;
         })
+        .attr("value", function(d) {
+          return d.id;
+        });
+      var stateSelectorPopup = stateSelectorWrapper.append('div')
+        .attr('class', 'choropleth--tooltip choropleth--tooltip-selector')
+        .style('display', 'none');
+      var last_selection = 'none';
+      var dataFips = [];
+      for (var i = 0; i < SELF.data.length; i++) {
+        dataFips[Number(SELF.data[i].id)] = i;
+      }
+      stateSelector.on("change", function (event) {
+        console.log(this);
+        console.log(event);
+        if (event.target.value === 'none' && 'none' !== last_selection) {
+          stateSelectorPopup.style('display', 'none');
+          stateSelectorPopup.html(null);
+        } else if (event.target.value !== last_selection) {
+          var datum = SELF.data[dataFips[Number(event.target.value)]];
+          stateSelectorPopup.html(renderTemplate(SELF.options.tooltipTemplate, datum));
+          stateSelectorPopup.style('display', 'block');
+        }
+        last_selection = event.target.value;
+      });
     }
   }
 
