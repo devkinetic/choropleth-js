@@ -1247,8 +1247,6 @@ ss.jenks = function(data, n_classes) {
         dataFips[Number(SELF.data[i].id)] = i;
       }
       stateSelector.on("change", function (event) {
-        console.log(this);
-        console.log(event);
         if (event.target.value === 'none' && 'none' !== last_selection) {
           stateSelectorPopup.style('display', 'none');
           stateSelectorPopup.html(null);
