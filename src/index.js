@@ -225,8 +225,6 @@ ss.jenks = function(data, n_classes) {
       .attr('d', SELF.path)
       .attr('class', function (d) { return applyUnitClasses(d, layerName)})
       .style("fill", function (d) {
-        console.log();
-
         return (d.properties.hasOwnProperty('value')) ? SELF.colorScale(d.properties.value) : null;
       });
   }
@@ -673,7 +671,7 @@ ss.jenks = function(data, n_classes) {
       // Unclassified
       case 'unclassified':
       default:
-        if (options.hasOwnProperty('unclassifiedOrdinal') && objectLength(options.unclassifiedOrdinal) > 0) {
+        if (options.hasOwnProperty('unclassifiedOrdinal') && options.unclassifiedOrdinal && objectLength(options.unclassifiedOrdinal) > 0) {
           numColors = objectLength(options.unclassifiedOrdinal);
         } else {
           numColors = 2;
